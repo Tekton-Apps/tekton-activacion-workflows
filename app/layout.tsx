@@ -7,9 +7,9 @@ const geistSans = Geist({
   subsets: ["latin"],
 });
 
-// Marca Tekton (ver docs/adr/0001, ahora que se suma como segunda entidad). Self-hosted vía
-// next/font, igual que Geist arriba: los archivos de fuente quedan servidos desde 'self',
-// así el CSP (next.config.ts) no necesita abrir font-src a Google Fonts.
+// Marca Tekton. Self-hosted vía next/font, igual que Geist arriba: los archivos de fuente
+// quedan servidos desde 'self', así el CSP (next.config.ts) no necesita abrir font-src a
+// Google Fonts.
 const golosText = Golos_Text({
   variable: "--font-golos-text",
   subsets: ["latin"],
@@ -26,8 +26,8 @@ const playfairDisplay = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  title: "Panel de Triggers — Equals11",
-  description: "Corré los workflows de n8n de Equals11 sin entrar a la UI de n8n.",
+  title: "Panel de Triggers — Tekton",
+  description: "Corré los workflows de n8n de Tekton sin entrar a la UI de n8n.",
 };
 
 export default function RootLayout({
@@ -37,8 +37,7 @@ export default function RootLayout({
 }>) {
   // `geistSans.variable` NO es opcional: define --font-geist-sans, que globals.css mapea a
   // --font-sans. Sin esta clase, `font-sans` cae al fallback del sistema sin error de build
-  // ni warning en consola — solo tipografía distinta que puede pasar desapercibida. Las dos
-  // variables de Tekton viajan igual, aunque solo el tab de Tekton las consuma (font-tk-*).
+  // ni warning en consola — solo tipografía distinta que puede pasar desapercibida.
   return (
     <html
       lang="es"

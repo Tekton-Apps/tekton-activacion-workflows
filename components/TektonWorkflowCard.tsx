@@ -22,11 +22,6 @@ function Spinner() {
   );
 }
 
-// Hermano de WorkflowCard (components/WorkflowCard.tsx), no una versión parametrizada: misma
-// lógica de estado/fetch/confirmación, pero con las clases de marca Tekton (bg-tk-primary,
-// acentos tk-secondary, fondo oscuro) en vez de las de Equals11. Duplicado a propósito — ver
-// CLAUDE.md: nada de un prop de "tema" para dos entidades en v1.
-//
 // `configured` lo calcula el Server Component (page.tsx) leyendo process.env server-side:
 // si al workflow le faltan sus env vars de webhook, la card se renderiza deshabilitada en vez
 // de un botón que dispararía un 500. Es el fail-closed también en el render, no solo en la API.

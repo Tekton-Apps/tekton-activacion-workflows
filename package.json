@@ -1,5 +1,5 @@
 {
-  "name": "workflows-triggers",
+  "name": "tekton-activacion-workflows",
   "version": "0.1.0",
   "private": true,
   "scripts": {

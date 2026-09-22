@@ -10,8 +10,8 @@ import { TektonWorkflowCard } from "@/components/TektonWorkflowCard";
 export function TektonPanel({
   workflows,
 }: {
-  // Ya resueltos por el Server Component (page.tsx), mismo criterio que equals11Content:
-  // filtrados por entity === "tekton" y con `configured` calculado leyendo process.env.
+  // Ya resueltos por el Server Component (page.tsx): filtrados por entity === "tekton" y
+  // con `configured` calculado leyendo process.env.
   workflows: { workflow: WorkflowTrigger; configured: boolean }[];
 }) {
   return (

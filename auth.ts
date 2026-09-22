@@ -7,9 +7,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
   providers: [Google],
   callbacks: {
-    // Antes chequeaba solo EQUALS11_ALLOWED_EMAILS: alguien allowed únicamente para otra
-    // entidad (ej. Tekton) quedaba bloqueado por Google antes de llegar a la app. El gate
-    // de login es "¿pertenece a ALGUNA entidad?" — cuál puede ver, lo decide cada página.
+    // El gate de login es "¿pertenece a ALGUNA entidad?" — cuál puede ver, lo decide cada
+    // página (hoy, con una sola entidad, siempre Tekton o ninguna).
     async signIn({ profile }) {
       return ENTITIES.some((entity) => isEmailAllowed(profile?.email, entity.allowedEmailsEnv));
     },

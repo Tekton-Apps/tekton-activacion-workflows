@@ -3,17 +3,7 @@
    simplemente no se genera ninguna utility. */
 @import "tailwindcss";
 
-/* Identidad Equals11. #00BFF2 es DECORATIVO: sobre blanco da 2.16:1 de contraste, muy
-   por debajo del 4.5:1 que pide WCAG AA. Va en barras de acento, focus rings y el
-   accent-color del checkbox — nunca como color de texto ni como fondo con texto encima.
-   El botón primario usa --color-e11-blue (6.69:1 con blanco) y oscurece en hover. */
-@theme {
-  --color-e11-blue: #00609f;
-  --color-e11-blue-dark: #004e80;
-  --color-e11-cyan: #00bff2;
-}
-
-/* Identidad Tekton. Igual que e11-cyan arriba, --color-tk-secondary (1.83:1 sobre blanco)
+/* Identidad Tekton. --color-tk-secondary (1.83:1 sobre blanco)
    y --color-tk-yellow (2.09:1) son DECORATIVOS por contraste — barras de acento y detalles
    puntuales, nunca texto. --color-tk-tertiary y --color-tk-purple sí pasan AA sobre blanco
    (5.05:1 y 6.02:1) pero se usan igual solo como acento: la superficie de marca es
@@ -48,9 +38,9 @@
   --font-tk-display: var(--font-playfair-display);
 }
 
-/* El panel es light-only por decisión de marca (fondo blanco). Sin esto, un usuario con
-   el SO en modo oscuro recibe los controles nativos —el checkbox— con estilo oscuro
-   sobre cards blancas. */
+/* El panel es dark-only por decisión de marca Tekton (fondo tk-black/tk-primary en toda la
+   app). Sin esto, un usuario con el SO en modo claro recibe los controles nativos —scrollbar,
+   checkbox— con estilo claro sobre fondo oscuro. */
 html {
-  color-scheme: light;
+  color-scheme: dark;
 }

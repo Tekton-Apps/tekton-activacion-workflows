@@ -4,4 +4,4 @@ El CSP original (`script-src 'self'`) bloqueaba los scripts inline que Next.js n
 
 ## Consequences
 
-Revisar esta decisión si se agregan inputs de usuario que se reflejen en la página, o si el panel crece a más entidades/usuarios (ver ADR-0001) — en ese momento el costo de un nonce por request probablemente sí se justifica.
+Revisar esta decisión si se agregan inputs de usuario que se reflejen en la página, o si el panel crece a más entidades/usuarios — en ese momento el costo de un nonce por request probablemente sí se justifica.

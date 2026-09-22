@@ -1,6 +1,6 @@
 # Panel de Triggers
 
-Panel interno de Equals11 (Boring Holding) para correr workflows de n8n manualmente vía webhook, sin entrar a la UI de n8n.
+Panel interno de Tekton para correr workflows de n8n manualmente vía webhook, sin entrar a la UI de n8n.
 
 ## Language
 
@@ -14,19 +14,16 @@ _Avoid_: Disparador, gatillo, activador
 
 ### Organización
 
-**Boring Holding**:
-La holding matriz. Dueña de las distintas entidades/proyectos operativos que corren bajo el panel (Equals11, Tekton, y futuras).
-
-**Equals11**:
-Entidad operativa bajo Boring Holding. Único scope de v1 de este panel — todos los workflows de esta versión son de Equals11.
-
 **Tekton**:
-Otra entidad operativa bajo Boring Holding. Sumada al panel el 2026-09-03 como su propia pestaña — hoy con dos workflows placeholder ("Workflow INC" y "Workflow SAC", uno por razón social) todavía sin webhook de n8n configurado.
+La entidad dueña del panel. Cada razón social (INC, SAC) tiene su propio workflow y su propia card.
 
 ### Workflows
 
-**New P&L creation**:
-Nombre oficial y único del workflow de v1, tal como aparece en n8n. Se usa el mismo nombre en inglés en la conversación diaria — no tiene apodo en español.
+**Workflow INC**:
+Convierte el P&L contable de Tekton INC en el P&L de management: recalcula regalías, rentings y vacaciones con el criterio que usa management, no el contable.
+
+**Workflow SAC**:
+Lo mismo que Workflow INC, para la razón social Tekton SAC.
 
 ### Ambientes
 
