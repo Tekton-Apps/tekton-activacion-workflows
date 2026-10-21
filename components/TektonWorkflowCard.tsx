@@ -116,8 +116,8 @@ export function TektonWorkflowCard({
                   role="alert"
                   className="mb-3 rounded-lg border border-red-400/30 bg-red-400/10 p-3 text-sm leading-relaxed text-red-200"
                 >
-                  <span className="font-semibold">No se pudo disparar el workflow. </span>
-                  Probá de nuevo; si vuelve a fallar, avisá en el canal.
+                  <span className="font-semibold">No se pudo correr el workflow. </span>
+                  Prueba de nuevo; si vuelve a fallar, avisa en el canal.
                 </div>
               )}
 

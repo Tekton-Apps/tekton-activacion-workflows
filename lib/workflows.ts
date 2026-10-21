@@ -1,8 +1,10 @@
-import type { EntityId } from "@/lib/entities";
+import type { TabId } from "@/lib/tabs";
 
 export interface WorkflowTrigger {
   id: string;
-  entity: EntityId;
+  // Pestaña donde se muestra la card. La whitelist del workflow es la de su pestaña
+  // (lib/tabs.ts): /api/trigger la revalida contra ESA pestaña, no contra cualquiera.
+  tab: TabId;
   label: string;
   confirmationQuestion: string;
   successMessage: string;
@@ -13,19 +15,18 @@ export interface WorkflowTrigger {
   env: {
     webhookUrl: string;
     webhookSecret: string;
-    allowedEmails: string;
   };
 }
 
 // Copia genérica compartida por los workflows que todavía no tienen un texto propio.
 const GENERIC_CONFIRMATION = "Confirmo que quiero correr este workflow ahora.";
 const GENERIC_SUCCESS =
-  "Solicitud enviada — vas a recibir la confirmación cuando termine.";
+  "Solicitud enviada. Recibirás la confirmación cuando termine.";
 
 export const WORKFLOWS: readonly WorkflowTrigger[] = [
   {
     id: "tekton-inc",
-    entity: "tekton",
+    tab: "contabilidad",
     label: "Workflow INC",
     description:
       "Convierte el P&L contable de Tekton INC en el P&L de management: recalcula " +
@@ -35,12 +36,11 @@ export const WORKFLOWS: readonly WorkflowTrigger[] = [
     env: {
       webhookUrl: "N8N_TEKTON_INC_WEBHOOK_URL",
       webhookSecret: "N8N_TEKTON_INC_WEBHOOK_SECRET",
-      allowedEmails: "TEKTON_ALLOWED_EMAILS",
     },
   },
   {
     id: "tekton-sac",
-    entity: "tekton",
+    tab: "contabilidad",
     label: "Workflow SAC",
     description:
       "Convierte el P&L contable de Tekton SAC en el P&L de management: recalcula " +
@@ -50,7 +50,6 @@ export const WORKFLOWS: readonly WorkflowTrigger[] = [
     env: {
       webhookUrl: "N8N_TEKTON_SAC_WEBHOOK_URL",
       webhookSecret: "N8N_TEKTON_SAC_WEBHOOK_SECRET",
-      allowedEmails: "TEKTON_ALLOWED_EMAILS",
     },
   },
 ];
