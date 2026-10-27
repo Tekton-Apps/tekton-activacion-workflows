@@ -1,16 +1,15 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
-import { ENTITIES } from "@/lib/entities";
-import { isEmailAllowed } from "@/lib/allowed-emails";
+import { allowedTabsFor } from "@/lib/tabs";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
   providers: [Google],
   callbacks: {
-    // El gate de login es "¿pertenece a ALGUNA entidad?" — cuál puede ver, lo decide cada
-    // página (hoy, con una sola entidad, siempre Tekton o ninguna).
+    // El gate de login es "¿tiene ALGUNA pestaña?" — cuáles ve, lo decide page.tsx, y cada
+    // API route revalida la de su pestaña puntual.
     async signIn({ profile }) {
-      return ENTITIES.some((entity) => isEmailAllowed(profile?.email, entity.allowedEmailsEnv));
+      return allowedTabsFor(profile?.email).length > 0;
     },
   },
 });

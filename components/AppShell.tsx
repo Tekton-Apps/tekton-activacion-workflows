@@ -1,16 +1,16 @@
 "use client";
 
 import { CompanyTabs } from "@/components/CompanyTabs";
-import type { EntityId } from "@/lib/entities";
+import type { TabId } from "@/lib/tabs";
 
 interface Tab {
-  id: EntityId;
+  id: TabId;
   label: string;
   content: React.ReactNode;
 }
 
-// Con una sola entidad (Tekton) el header no necesita levantar estado de "cuál pestaña está
-// activa" — CompanyTabs ya colapsa a renderizar el contenido directo cuando hay 0 o 1 pestaña.
+// El header no necesita levantar estado de "cuál pestaña está activa": CompanyTabs lo maneja
+// y colapsa a renderizar el contenido directo cuando hay 0 o 1 pestaña.
 // Este componente queda como el shell fijo de marca Tekton (header oscuro + logo textual).
 export function AppShell({
   tabs,

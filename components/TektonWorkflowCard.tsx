@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { isN8nConfigError, N8N_CONFIG_ERROR_MESSAGE } from "@/lib/n8n-errors";
 import type { WorkflowTrigger } from "@/lib/workflows";
 
 function Spinner() {
@@ -34,7 +35,7 @@ export function TektonWorkflowCard({
 }) {
   const [confirmed, setConfirmed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState<"success" | "error" | null>(null);
+  const [result, setResult] = useState<"success" | "error" | "config-error" | null>(null);
 
   async function handleClick() {
     // Limpiar el error anterior antes de reintentar. Sin esto el panel rojo sigue en
@@ -47,7 +48,13 @@ export function TektonWorkflowCard({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ workflowId: workflow.id, confirmed: true }),
       });
-      setResult(res.ok ? "success" : "error");
+      if (res.ok) {
+        setResult("success");
+      } else {
+        const data: unknown = await res.json().catch(() => null);
+        // config-error: n8n rechazó el secret (ver lib/n8n-errors.ts) — reintentar no lo arregla.
+        setResult(isN8nConfigError(data) ? "config-error" : "error");
+      }
     } catch {
       setResult("error");
     } finally {
@@ -111,13 +118,21 @@ export function TektonWorkflowCard({
             </div>
           ) : (
             <>
+              {result === "config-error" && (
+                <div
+                  role="alert"
+                  className="mb-3 rounded-lg border border-red-400/30 bg-red-400/10 p-3 text-sm leading-relaxed text-red-200"
+                >
+                  {N8N_CONFIG_ERROR_MESSAGE}
+                </div>
+              )}
               {result === "error" && (
                 <div
                   role="alert"
                   className="mb-3 rounded-lg border border-red-400/30 bg-red-400/10 p-3 text-sm leading-relaxed text-red-200"
                 >
-                  <span className="font-semibold">No se pudo disparar el workflow. </span>
-                  Probá de nuevo; si vuelve a fallar, avisá en el canal.
+                  <span className="font-semibold">No se pudo correr el workflow. </span>
+                  Prueba de nuevo; si vuelve a fallar, avisa en el canal.
                 </div>
               )}
 

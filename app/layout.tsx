@@ -27,7 +27,7 @@ const playfairDisplay = Playfair_Display({
 
 export const metadata: Metadata = {
   title: "Panel de Triggers — Tekton",
-  description: "Corré los workflows de n8n de Tekton sin entrar a la UI de n8n.",
+  description: "Corre los workflows de n8n de Tekton sin entrar a la UI de n8n.",
 };
 
 export default function RootLayout({

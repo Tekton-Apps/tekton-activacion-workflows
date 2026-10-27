@@ -2,7 +2,11 @@ import Link from "next/link";
 import { auth, signOut } from "@/auth";
 import { AppShell } from "@/components/AppShell";
 import { TektonPanel } from "@/components/TektonPanel";
-import { ENTITIES, allowedEntitiesFor } from "@/lib/entities";
+import { RhPanel } from "@/components/RhPanel";
+import { EXECUTIONS_ENDPOINT } from "@/lib/executions";
+import { RH_LIQ_ENDPOINT, RH_WORKERS_ENDPOINT } from "@/lib/rh";
+import { isN8nConfigured } from "@/lib/server/n8n";
+import { TABS, allowedTabsFor, type TabId } from "@/lib/tabs";
 import { WORKFLOWS } from "@/lib/workflows";
 
 // Server action compartida por el botón de "Cerrar sesión" del header (vía AppShell, client
@@ -38,23 +42,23 @@ export default async function Home() {
     );
   }
 
-  // Qué entidades puede ver esta persona. El login (auth.ts) ya exige pertenecer a AL MENOS
-  // una; esto decide específicamente cuáles (hoy, siempre "tekton" o ninguna).
+  // Qué pestañas puede ver esta persona. El login (auth.ts) ya exige tener AL MENOS una; esto
+  // decide específicamente cuáles. Cada API route vuelve a validar la de su pestaña.
   const email = session.user?.email;
-  const allowedEntities = allowedEntitiesFor(email);
+  const allowedTabs = allowedTabsFor(email);
 
   // Solo alcanzable si a alguien se le sacó de la whitelist después de que su sesión JWT ya se
   // emitió (revocación sin logout forzado — mismo caso que ya maneja /api/trigger). Fail-closed
   // también acá: sin esto, `tabs` quedaría vacío y CompanyTabs no renderizaría nada, una
   // pantalla en blanco sin explicación.
-  if (allowedEntities.length === 0) {
+  if (allowedTabs.length === 0) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-tk-black px-4">
         <div className="w-full max-w-sm rounded-tk-lg border border-white/10 bg-tk-primary p-8 text-center shadow-sm">
           <h1 className="text-lg font-semibold text-white">Sin acceso</h1>
           <p className="mt-2 text-sm text-tk-secondary/80">
             Tu cuenta ({email}) ya no tiene ningún workflow habilitado. Si esto es un error,
-            avisá en el canal.
+            avisa en el canal.
           </p>
           <form action={signOutAction}>
             <button
@@ -69,24 +73,42 @@ export default async function Home() {
     );
   }
 
-  // Fail-closed en el render: por cada workflow chequeamos server-side que existan sus env vars
-  // de webhook. Si faltan, la card sale deshabilitada (TektonWorkflowCard lo maneja) en vez de
-  // ofrecer un botón que terminaría en un 500. Pasar `workflow` al cliente es seguro: env guarda
+  // Fail-closed en el render: chequeamos server-side que existan las env vars de cada webhook.
+  // Si faltan, la card / el formulario / el historial salen como "No configurado" en vez de
+  // ofrecer algo que terminaría en un 500. Pasar `workflow` al cliente es seguro: env guarda
   // NOMBRES de env var, no valores. La página ya es dinámica (await auth), así que process.env
   // se lee por request.
-  const tektonWorkflows = WORKFLOWS.filter((workflow) => workflow.entity === "tekton").map(
-    (workflow) => ({
-      workflow,
-      configured: Boolean(
-        process.env[workflow.env.webhookUrl] && process.env[workflow.env.webhookSecret],
-      ),
-    }),
-  );
+  const historyConfigured = isN8nConfigured(EXECUTIONS_ENDPOINT);
 
-  const tabs = ENTITIES.filter((entity) => allowedEntities.includes(entity.id)).map((entity) => ({
-    id: entity.id,
-    label: entity.label,
-    content: <TektonPanel workflows={tektonWorkflows} />,
+  const contabilidadWorkflows = WORKFLOWS.filter(
+    (workflow) => workflow.tab === "contabilidad",
+  ).map((workflow) => ({
+    workflow,
+    configured: isN8nConfigured({
+      urlEnv: workflow.env.webhookUrl,
+      secretEnv: workflow.env.webhookSecret,
+    }),
+  }));
+
+  // Solo se construye el contenido de las pestañas permitidas: el resto ni llega al cliente.
+  const content: Record<TabId, () => React.ReactNode> = {
+    contabilidad: () => (
+      <TektonPanel workflows={contabilidadWorkflows} historyConfigured={historyConfigured} />
+    ),
+    rh: () => (
+      <RhPanel
+        formConfigured={
+          isN8nConfigured(RH_WORKERS_ENDPOINT) && isN8nConfigured(RH_LIQ_ENDPOINT)
+        }
+        historyConfigured={historyConfigured}
+      />
+    ),
+  };
+
+  const tabs = TABS.filter((tab) => allowedTabs.includes(tab.id)).map((tab) => ({
+    id: tab.id,
+    label: tab.label,
+    content: content[tab.id](),
   }));
 
   return <AppShell tabs={tabs} email={email} signOutAction={signOutAction} />;
