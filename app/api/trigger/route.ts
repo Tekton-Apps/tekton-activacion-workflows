@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { isSameOrigin } from "@/lib/server/guard";
+import { callN8n, logN8nFailure, n8nAuthFailedResponse } from "@/lib/server/n8n";
 import { allowedTabsFor, canAccessTab } from "@/lib/tabs";
 import { WORKFLOWS } from "@/lib/workflows";
 
@@ -61,64 +62,38 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "confirmation required" }, { status: 400 });
   }
 
-  // 7. Disparar el webhook de n8n. URL y secret se leen server-side (nunca llegan al cliente),
-  // vía los NOMBRES de env var que guarda el workflow.
-  const webhookUrl = process.env[workflow.env.webhookUrl];
-  const webhookSecret = process.env[workflow.env.webhookSecret];
-  if (!webhookUrl || !webhookSecret) {
-    // Fail-closed: si falta config, no inventamos un éxito. No logueamos el valor del secret.
-    console.error(
-      `Config faltante: ${workflow.env.webhookUrl} o ${workflow.env.webhookSecret} no están seteadas`,
-    );
-    return NextResponse.json({ error: "server misconfigured" }, { status: 500 });
-  }
-
+  // 7. Disparar el webhook de n8n. URL y secret se leen server-side dentro de callN8n (nunca
+  // llegan al cliente), vía los NOMBRES de env var que guarda el workflow.
   // request_id y solicitante los pone el servidor, nunca el cliente: request_id cruza este
   // disparo con su fila en el historial de n8n y con los logs de Vercel; el email sale de la
   // sesión ya validada. Ver docs/adr/0004-pestanas-parametros-request-id-historial.md.
+  // El webhook responde de inmediato (responseMode onReceived), así que resuelve en ms.
   const requestId = randomUUID();
-
-  try {
-    const res = await fetch(webhookUrl, {
+  const log = {
+    event: "trigger-failed",
+    workflow: workflow.id,
+    request_id: requestId,
+    user: email,
+  };
+  const result = await callN8n(
+    { urlEnv: workflow.env.webhookUrl, secretEnv: workflow.env.webhookSecret },
+    {
       method: "POST",
-      headers: {
-        "X-Webhook-Secret": webhookSecret,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        workflow: workflow.id,
-        request_id: requestId,
-        solicitante_email: email,
-      }),
-      // El webhook responde de inmediato (responseMode onReceived), así que resuelve en ms.
-      // El timeout solo es una guarda contra una conexión colgada, no contra los ~40 nodos.
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (!res.ok) {
-      console.error(
-        JSON.stringify({
-          event: "trigger-failed",
-          ts: new Date().toISOString(),
-          workflow: workflow.id,
-          request_id: requestId,
-          user: email,
-          status: res.status,
-        }),
-      );
-      return NextResponse.json({ error: "trigger failed" }, { status: 502 });
-    }
-  } catch (err) {
-    console.error(
-      JSON.stringify({
-        event: "trigger-failed",
-        ts: new Date().toISOString(),
-        workflow: workflow.id,
-        request_id: requestId,
-        user: email,
-        status: "network-error",
-        error: err instanceof Error ? err.message : String(err),
-      }),
-    );
+      body: { workflow: workflow.id, request_id: requestId, solicitante_email: email },
+      log,
+    },
+  );
+
+  if (result.kind === "misconfigured") {
+    // Fail-closed: si falta config, no inventamos un éxito.
+    return NextResponse.json({ error: "server misconfigured" }, { status: 500 });
+  }
+  if (result.kind === "auth-failed") return n8nAuthFailedResponse();
+  if (result.kind === "network-error") {
+    return NextResponse.json({ error: "trigger failed" }, { status: 502 });
+  }
+  if (result.status < 200 || result.status >= 300) {
+    logN8nFailure(log, result.status);
     return NextResponse.json({ error: "trigger failed" }, { status: 502 });
   }
 

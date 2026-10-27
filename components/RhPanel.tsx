@@ -5,6 +5,7 @@ import { useTabActive } from "@/components/CompanyTabs";
 import { ExecutionHistory } from "@/components/ExecutionHistory";
 import { WorkerCombobox } from "@/components/WorkerCombobox";
 import { validateLiquidacion, type HuboVariables } from "@/lib/liquidacion";
+import { isN8nConfigError, N8N_CONFIG_ERROR_MESSAGE } from "@/lib/n8n-errors";
 import type { Worker } from "@/lib/rh";
 
 const HUBO_OPTIONS: { value: HuboVariables; label: string }[] = [
@@ -22,13 +23,15 @@ function parseAmount(raw: string): number | undefined {
 }
 
 type WorkersState =
-  | { status: "idle" | "loading" | "error" }
+  | { status: "idle" | "loading" }
+  // config: n8n rechazó el secret (ver lib/n8n-errors.ts) — reintentar no lo arregla.
+  | { status: "error"; config: boolean }
   | { status: "ok"; workers: Worker[] };
 
 type SubmitResult =
   | { kind: "ok"; version: string | null }
   | { kind: "errores"; errores: string[] }
-  | { kind: "error" };
+  | { kind: "error"; config: boolean };
 
 export function RhPanel({
   formConfigured,
@@ -59,10 +62,14 @@ export function RhPanel({
     setWorkersState({ status: "loading" });
     try {
       const res = await fetch("/api/rh/workers", { cache: "no-store" });
-      if (!res.ok) throw new Error(String(res.status));
+      if (!res.ok) {
+        const data: unknown = await res.json().catch(() => null);
+        setWorkersState({ status: "error", config: isN8nConfigError(data) });
+        return;
+      }
       setWorkersState({ status: "ok", workers: (await res.json()) as Worker[] });
     } catch {
-      setWorkersState({ status: "error" });
+      setWorkersState({ status: "error", config: false });
     }
   }, []);
 
@@ -106,6 +113,7 @@ export function RhPanel({
       const data = (await res.json().catch(() => null)) as {
         version?: string | null;
         errores?: string[];
+        error?: string;
       } | null;
       if (res.ok) {
         setResult({ kind: "ok", version: data?.version ?? null });
@@ -114,11 +122,11 @@ export function RhPanel({
       } else if (Array.isArray(data?.errores) && data.errores.length > 0) {
         setResult({ kind: "errores", errores: data.errores });
       } else {
-        setResult({ kind: "error" });
+        setResult({ kind: "error", config: isN8nConfigError(data) });
       }
       if (res.ok || res.status === 422) setHistoryKey((k) => k + 1);
     } catch {
-      setResult({ kind: "error" });
+      setResult({ kind: "error", config: false });
     } finally {
       setSubmitting(false);
     }
@@ -158,7 +166,9 @@ export function RhPanel({
             </label>
             {workersState.status === "error" ? (
               <div role="alert" className="flex items-center justify-between gap-3 rounded-lg border border-red-400/30 bg-red-400/10 p-3 text-sm text-red-200">
-                No se pudo cargar la lista de trabajadores.
+                {workersState.config
+                  ? N8N_CONFIG_ERROR_MESSAGE
+                  : "No se pudo cargar la lista de trabajadores."}
                 <button
                   type="button"
                   onClick={() => void loadWorkers()}
@@ -328,8 +338,14 @@ export function RhPanel({
             )}
             {result?.kind === "error" && (
               <div role="alert" className="rounded-lg border border-red-400/30 bg-red-400/10 p-3 text-sm leading-relaxed text-red-200">
-                <span className="font-semibold">No se pudo enviar la solicitud. </span>
-                Prueba de nuevo; si vuelve a fallar, avisa en el canal.
+                {result.config ? (
+                  N8N_CONFIG_ERROR_MESSAGE
+                ) : (
+                  <>
+                    <span className="font-semibold">No se pudo enviar la solicitud. </span>
+                    Prueba de nuevo; si vuelve a fallar, avisa en el canal.
+                  </>
+                )}
               </div>
             )}
           </div>

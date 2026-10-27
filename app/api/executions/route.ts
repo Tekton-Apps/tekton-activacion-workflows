@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { guardTabRequest } from "@/lib/server/guard";
-import { callN8n, logN8nFailure } from "@/lib/server/n8n";
+import { callN8n, logN8nFailure, n8nAuthFailedResponse } from "@/lib/server/n8n";
 import {
   EXECUTION_AREAS,
   EXECUTIONS_ENDPOINT,
@@ -28,8 +28,16 @@ export async function GET(req: Request) {
   if (result.kind === "misconfigured") {
     return NextResponse.json({ error: "server misconfigured" }, { status: 500 });
   }
+  if (result.kind === "auth-failed") return n8nAuthFailedResponse();
   if (result.kind === "network-error") {
     return NextResponse.json({ error: "upstream failed" }, { status: 502 });
+  }
+  // n8n responde 400 con un mensaje si el área es inválida. No debería pasar (el área sale de
+  // EXECUTION_AREAS, no del usuario), así que es un bug nuestro: 500 genérico, sin reenviar el
+  // mensaje de n8n.
+  if (result.status === 400) {
+    logN8nFailure(log, result.status);
+    return NextResponse.json({ error: "server error" }, { status: 500 });
   }
   if (result.status < 200 || result.status >= 300) {
     logN8nFailure(log, result.status);

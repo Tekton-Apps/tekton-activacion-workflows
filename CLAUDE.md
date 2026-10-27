@@ -26,7 +26,8 @@ Variables por ambiente:
 
 **Autenticación del webhook (resuelto):** el nodo Webhook de n8n valida un header `X-Webhook-Secret` (Header Auth). El login de Google filtra quién ve el botón; el secret del header impide que alguien corra el workflow con solo tener la URL. Si la URL se filtra (logs, Slack, historial de n8n) sin el secret, no alcanza para dispararlo.
 
-- El secret vive solo como env var server-side (`N8N_TEKTON_INC_WEBHOOK_SECRET`, `N8N_TEKTON_SAC_WEBHOOK_SECRET`). Nunca en código, nunca expuesto al cliente.
+- El secret vive solo como env var server-side (`N8N_TEKTON_*_SECRET`, uno por webhook). Nunca en código, nunca expuesto al cliente. Cada webhook tiene su propia credencial Header Auth en n8n: nunca reutilizar el secret de otro (RH y ejecuciones no comparten el de "Header SAC").
+- Si n8n rechaza el secret (403 "Authorization data is wrong!", o 401), es un error de configuración: se loguea `n8n-auth-failed` con el nombre de la env var y el usuario ve "No se pudo conectar con el sistema. Avisa a Luca." (`lib/n8n-errors.ts`). Nunca se muestra el 401/403 tal cual.
 - El botón de "correr" (el trigger) llama a una API route propia de Next.js (`/api/trigger`, genérica: recibe `{ workflowId, confirmed }` y busca el workflow en `WORKFLOWS`). Esa API route es la única que conoce el secret y hace el POST a n8n. El navegador del usuario nunca ve la URL real del webhook ni el secret.
 
 Además:
@@ -56,3 +57,13 @@ Ver `CONTEXT.md` — glosario del negocio (verbos, entidades, ambientes) generad
 **No correr ese comando para "reconstituir" o "actualizar" skills.** Verificado el 2026-09-03: la fuente (`mattpocock/skills` en GitHub) tuvo deriva significativa desde que se generó el lockfile — 8 de los 41 skills listados ya no existen en la fuente, y de los 33 restantes, 30 traen contenido distinto al congelado acá (confirmado archivo por archivo, no solo por hash). El comando no valida ni alerta sobre nada de esto: sobreescribe `skills-lock.json` con lo que encuentre en upstream en ese momento, sin comparar contra la versión anterior ni pedir confirmación.
 
 Si en el futuro se quiere modernizar algún skill puntual, hacerlo a mano — comparando explícitamente contra la fuente, nunca con un `add` ciego.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useTabActive } from "@/components/CompanyTabs";
 import type { Execution, ExecutionArea } from "@/lib/executions";
+import { isN8nConfigError, N8N_CONFIG_ERROR_MESSAGE } from "@/lib/n8n-errors";
 
 const ESTADOS: Record<string, { label: string; className: string }> = {
   en_proceso: { label: "En proceso", className: "border-tk-tertiary/40 bg-tk-tertiary/15 text-sky-200" },
@@ -33,12 +34,73 @@ function plural(n: number, singular: string, pluralForm: string) {
 }
 
 type LoadState =
-  | { status: "loading" }
+  // `rows`: lo último que se mostró, para no vaciar la tabla mientras recarga.
+  | { status: "loading"; rows?: Execution[] }
   | { status: "ok"; rows: Execution[] }
-  | { status: "error" };
+  | { status: "error"; config: boolean };
+
+type LoadResult = Exclude<LoadState, { status: "loading" }>;
+
+interface InflightRequest {
+  promise: Promise<LoadResult>;
+  controller: AbortController;
+  subscribers: number;
+}
+
+// Pedidos en vuelo, por clave (área + refreshKey + "Actualizar"). Si el mismo pedido ya salió, se
+// reusa en vez de volver a pegarle a n8n: cubre el doble montaje de StrictMode en dev (efecto →
+// cleanup → efecto). Se borra al resolver, así que reabrir la pestaña pide de nuevo.
+const inflight = new Map<string, InflightRequest>();
+
+function subscribeExecutions(area: ExecutionArea, key: string) {
+  let entry = inflight.get(key);
+  if (!entry) {
+    const controller = new AbortController();
+    const promise = (async (): Promise<LoadResult> => {
+      try {
+        const res = await fetch(`/api/executions?area=${area}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        if (!res.ok) {
+          const data: unknown = await res.json().catch(() => null);
+          return { status: "error", config: isN8nConfigError(data) };
+        }
+        return { status: "ok", rows: (await res.json()) as Execution[] };
+      } catch {
+        return { status: "error", config: false };
+      } finally {
+        if (inflight.get(key)?.controller === controller) inflight.delete(key);
+      }
+    })();
+    entry = { promise, controller, subscribers: 0 };
+    inflight.set(key, entry);
+  }
+  const request = entry;
+  request.subscribers++;
+  let released = false;
+  return {
+    promise: request.promise,
+    // Al cambiar de pestaña se cancela el pedido si nadie más lo espera. Diferido un tick porque
+    // StrictMode hace cleanup y se vuelve a suscribir enseguida: ahí no hay que cancelar.
+    release() {
+      if (released) return;
+      released = true;
+      request.subscribers--;
+      setTimeout(() => {
+        if (request.subscribers === 0 && inflight.get(key) === request) {
+          inflight.delete(key);
+          request.controller.abort();
+        }
+      }, 0);
+    },
+  };
+}
 
 // Historial leído desde n8n (vía /api/executions). No se refresca solo: carga cada vez que se
 // abre la pestaña, cuando cambia `refreshKey` (ej. después de "Generar") y con "Actualizar".
+// Carga en segundo plano: nunca bloquea el cambio de pestaña, y si la pestaña se cierra antes de
+// que vuelva, el pedido se cancela y la respuesta se ignora.
 export function ExecutionHistory({
   area,
   configured,
@@ -50,24 +112,29 @@ export function ExecutionHistory({
 }) {
   const active = useTabActive();
   const [state, setState] = useState<LoadState>({ status: "loading" });
-
-  const load = useCallback(async () => {
-    setState({ status: "loading" });
-    try {
-      const res = await fetch(`/api/executions?area=${area}`, { cache: "no-store" });
-      if (!res.ok) throw new Error(String(res.status));
-      setState({ status: "ok", rows: (await res.json()) as Execution[] });
-    } catch {
-      setState({ status: "error" });
-    }
-  }, [area]);
+  const [reloadCount, setReloadCount] = useState(0);
 
   useEffect(() => {
-    // Sin config no se pide nada: la sección se muestra como "No configurado".
+    // Sin config no se pide nada: la sección se muestra como "No configurado". Pestaña oculta
+    // tampoco: se pide recién al abrirla.
     if (!configured || !active) return;
+    let current = true;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- carga de datos externos al abrir la pestaña
-    void load();
-  }, [configured, active, load, refreshKey]);
+    setState((prev) => ({
+      status: "loading",
+      rows: prev.status === "error" ? undefined : prev.rows,
+    }));
+    const request = subscribeExecutions(area, `${area}:${refreshKey}:${reloadCount}`);
+    void request.promise.then((result) => {
+      if (current) setState(result);
+    });
+    return () => {
+      current = false;
+      request.release();
+    };
+  }, [configured, active, area, refreshKey, reloadCount]);
+
+  const rows = state.status === "error" ? undefined : state.rows;
 
   return (
     <section aria-labelledby={`historial-${area}`} className="mt-10">
@@ -78,7 +145,7 @@ export function ExecutionHistory({
         {configured ? (
           <button
             type="button"
-            onClick={() => void load()}
+            onClick={() => setReloadCount((n) => n + 1)}
             disabled={state.status === "loading"}
             className="rounded-tk-md border border-tk-secondary/30 px-3 py-1.5 text-sm font-medium text-tk-secondary transition-colors hover:border-tk-secondary hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tk-secondary disabled:cursor-not-allowed disabled:opacity-60"
           >
@@ -101,12 +168,13 @@ export function ExecutionHistory({
             role="alert"
             className="rounded-lg border border-red-400/30 bg-red-400/10 p-3 text-sm text-red-200"
           >
-            No se pudo cargar el historial. Prueba con «Actualizar»; si sigue fallando, avisa en el
-            canal.
+            {state.config
+              ? N8N_CONFIG_ERROR_MESSAGE
+              : "No se pudo cargar el historial. Prueba con «Actualizar»; si sigue fallando, avisa en el canal."}
           </div>
-        ) : state.status === "loading" ? (
+        ) : !rows ? (
           <p className="text-sm text-tk-medium">Cargando historial…</p>
-        ) : state.rows.length === 0 ? (
+        ) : rows.length === 0 ? (
           <p className="text-sm text-tk-medium">Todavía no hay ejecuciones registradas.</p>
         ) : (
           <div className="overflow-x-auto rounded-tk-lg border border-white/10">
@@ -122,7 +190,7 @@ export function ExecutionHistory({
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/10">
-                {state.rows.map((row, i) => {
+                {rows.map((row, i) => {
                   const estado = ESTADOS[row.estado] ?? {
                     label: row.estado,
                     className: "border-white/10 bg-white/5 text-tk-medium",
